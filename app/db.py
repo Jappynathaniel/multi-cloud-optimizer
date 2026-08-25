@@ -20,6 +20,15 @@ class CloudConnection(Base):
     runs: Mapped[list["CollectionRun"]] = relationship(back_populates="connection", cascade="all, delete-orphan")
 
 
+class AgentConnection(Base):
+    __tablename__ = "agent_connections"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    provider: Mapped[str] = mapped_column(String(24), index=True)
+    encrypted_config: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class CollectionRun(Base):
     __tablename__ = "collection_runs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
