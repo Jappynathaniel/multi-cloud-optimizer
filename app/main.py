@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.agents import explain_recommendation
 from app.config import get_settings
-from app.db import CloudConnection, CollectionRun, CostRecord, Recommendation, RecommendationEvent, get_session, init_db
+from app.db import AgentConnection, CloudConnection, CollectionRun, CostRecord, Recommendation, RecommendationEvent, get_session, init_db
 from app.scenarios import ScenarioRequest, analyze_scenario
-from app.schemas import AgentQuestion, ConnectionCreate, RecommendationDecision
-from app.security import encrypt_config
+from app.schemas import AgentConnectionCreate, AgentQuestion, ConnectionCreate, RecommendationDecision
+from app.security import decrypt_config, encrypt_config
 from app.services import build_recommendations, collect_connection
 
 
@@ -58,6 +58,22 @@ def create_connection(payload: ConnectionCreate, session: Session = Depends(get_
 def list_connections(session: Session = Depends(get_session)):
     rows = session.scalars(select(CloudConnection).order_by(CloudConnection.id.desc())).all()
     return [{"id": row.id, "name": row.name, "provider": row.provider, "status": row.status, "created_at": row.created_at} for row in rows]
+
+
+@app.post("/v1/agent-connections", status_code=201)
+def create_agent_connection(payload: AgentConnectionCreate, session: Session = Depends(get_session)):
+    if session.scalar(select(AgentConnection).where(AgentConnection.name == payload.name)):
+        raise HTTPException(409, "An agent connection with this name already exists")
+    row = AgentConnection(name=payload.name, provider=payload.provider,
+        encrypted_config=encrypt_config({"provider": payload.provider, "api_key": payload.api_key, "model": payload.model}))
+    session.add(row); session.commit(); session.refresh(row)
+    return {"id": row.id, "name": row.name, "provider": row.provider, "model": payload.model}
+
+
+@app.get("/v1/agent-connections")
+def list_agent_connections(session: Session = Depends(get_session)):
+    rows = session.scalars(select(AgentConnection).order_by(AgentConnection.id.desc())).all()
+    return [{"id": row.id, "name": row.name, "provider": row.provider, "created_at": row.created_at} for row in rows]
 
 
 @app.post("/v1/connections/{connection_id}/collect")
@@ -114,8 +130,13 @@ def capacity_scenario(payload: ScenarioRequest):
 def agent_explanation(recommendation_id: int, payload: AgentQuestion, session: Session = Depends(get_session)):
     row = session.get(Recommendation, recommendation_id)
     if not row: raise HTTPException(404, "Recommendation not found")
+    agent_config = None
+    if payload.agent_connection_id:
+        connection = session.get(AgentConnection, payload.agent_connection_id)
+        if not connection: raise HTTPException(404, "Agent connection not found")
+        agent_config = decrypt_config(connection.encrypted_config)
     return explain_recommendation({"title": row.title, "kind": row.kind, "risk": row.risk,
-        "confidence": row.confidence, "savings": row.estimated_monthly_savings, "evidence": row.evidence}, payload.question)
+        "confidence": row.confidence, "savings": row.estimated_monthly_savings, "evidence": row.evidence}, payload.question, agent_config)
 
 
 @app.get("/v1/portfolio")
