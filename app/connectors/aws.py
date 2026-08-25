@@ -8,10 +8,15 @@ class AWSConnector(CloudConnector):
 
     def _session(self):
         import boto3
+        base_session = boto3.Session(
+            aws_access_key_id=self.config.get("access_key_id"),
+            aws_secret_access_key=self.config.get("secret_access_key"),
+            region_name=self.config.get("region", "us-east-1"),
+        )
         role_arn = self.config.get("role_arn")
         if not role_arn:
-            return boto3.Session(region_name=self.config.get("region", "us-east-1"))
-        sts = boto3.client("sts")
+            return base_session
+        sts = base_session.client("sts")
         args = {"RoleArn": role_arn, "RoleSessionName": "redbridge-readonly"}
         if self.config.get("external_id"):
             args["ExternalId"] = self.config["external_id"]

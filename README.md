@@ -25,6 +25,29 @@ export REDBRIDGE_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fe
 Open `http://127.0.0.1:8000`. For Windows, use `.venv\\Scripts\\` instead of
 `.venv/bin/`.
 
+## Terminal workflow (recommended)
+
+The terminal is the quickest way to run RedBridge. It prompts for secrets
+without echoing them; use environment variables instead of putting secrets in
+shell history when automating it.
+
+```bash
+# First run asks for the read-only AWS key and secret without displaying them.
+python -m app.cli connect aws --name production --region us-east-1
+
+# Or provide the two values to the process environment, not command history.
+REDBRIDGE_AWS_ACCESS_KEY_ID=... REDBRIDGE_AWS_SECRET_ACCESS_KEY=... \
+  python -m app.cli connect aws --name production --region us-east-1
+
+python -m app.cli collect 1
+python -m app.cli recommend 1
+python -m app.cli report --connection-id 1
+```
+
+`connect` encrypts the connection settings in RedBridge's database;
+`collect` reads provider facts; `recommend` creates findings; and `report`
+prints the evidence. None of these commands change cloud resources.
+
 ## Cloud onboarding
 
 Create a connection with `POST /v1/connections`, then call
@@ -36,9 +59,12 @@ Create a connection with `POST /v1/connections`, then call
 {"name":"prod-aws","provider":"aws","config":{"role_arn":"arn:aws:iam::123456789012:role/RedBridgeReadOnly","external_id":"unique-value","region":"us-east-1"}}
 ```
 
-Use a cross-account role that permits only EC2 describe, Cost Explorer
-read/query, STS assume-role, and Compute Optimizer read actions. Cost Explorer
-and Compute Optimizer must be enabled by the customer.
+For the quickest connection, include `access_key_id` and `secret_access_key`
+in the encrypted configuration, or set them as Render environment variables.
+For a production account, use a cross-account role and an external ID instead.
+The source identity needs only EC2 describe, Cost Explorer read/query, STS
+assume-role, and Compute Optimizer read actions. Cost Explorer and Compute
+Optimizer must be enabled by the customer.
 
 ### Azure
 
