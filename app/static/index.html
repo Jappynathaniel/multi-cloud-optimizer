@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RedBridge FinOps</title><style>body{font:16px system-ui;max-width:960px;margin:32px auto;padding:0 16px;background:#07111f;color:#e5edf8}section{background:#101e31;padding:20px;margin:16px 0;border-radius:12px}input,select,textarea,button{padding:9px;margin:4px;width:100%;box-sizing:border-box}button{background:#32c48d;border:0;border-radius:6px;font-weight:bold;cursor:pointer}pre{white-space:pre-wrap;overflow:auto;background:#07111f;padding:12px;border-radius:6px}.muted{color:#aab9cc}</style></head><body>
+<h1>RedBridge FinOps</h1><p class="muted">Read-only multi-cloud discovery and approval-ready optimization.</p>
+<section><h2>Connect a cloud</h2><p class="muted">Configuration is encrypted before it is stored. Use least-privilege, read-only identities.</p>
+<input id="name" placeholder="Connection name e.g. production-aws"><select id="provider"><option value="aws">AWS</option><option value="azure">Azure</option><option value="gcp">GCP</option></select>
+<textarea id="config" rows="7" placeholder='AWS: {"role_arn":"arn:aws:iam::123:role/RedBridgeReadOnly","region":"us-east-1"}'></textarea><button onclick="connect()">Save connection</button></section>
+<section><h2>Connections</h2><button onclick="loadConnections()">Refresh</button><pre id="connections"></pre></section>
+<section><h2>Recommendations</h2><button onclick="loadRecommendations()">Refresh</button><pre id="recommendations"></pre></section>
+<script>
+async function api(path, options={}){const r=await fetch(path,{headers:{'Content-Type':'application/json'},...options});const b=await r.json();if(!r.ok)throw new Error(JSON.stringify(b));return b}
+async function connect(){try{const body={name:name.value,provider:provider.value,config:JSON.parse(config.value)};await api('/v1/connections',{method:'POST',body:JSON.stringify(body)});await loadConnections()}catch(e){alert(e.message)}}
+async function loadConnections(){const rows=await api('/v1/connections');connections.textContent=JSON.stringify(rows,null,2)}
+async function loadRecommendations(){const rows=await api('/v1/recommendations');recommendations.textContent=JSON.stringify(rows,null,2)}
+loadConnections();loadRecommendations();
+</script></body></html>
+
