@@ -1,71 +1,87 @@
-# RedBridge AI 🚀
-> Multi-Cloud Cost Optimizer - Production API
+# RedBridge FinOps
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://your-app.onrender.com/demo)
-[![API Status](https://img.shields.io/badge/API-Active-blue)](https://your-app.onrender.com/health)
+RedBridge is a read-only, multi-cloud FinOps API and dashboard. It collects
+real provider billing facts, plus AWS EC2 inventory and native rightsizing
+findings, stores the evidence, creates deterministic recommendations, and uses
+an optional AI agent only to explain established data. It never executes a
+cloud-provider change.
 
-## 🎯 Live Production System
+## Product boundary
 
-**API Endpoint:** `https://redbrigde-ai.onrender.com`
+- **Does:** collect cost/inventory data; retain evidence; surface provider
+  rightsizing findings; detect safe policy candidates; prepare review material.
+- **Does not:** accept credentials in normal workload requests; fabricate
+  savings; let an agent mutate cloud resources; auto-approve a change.
 
-**Quick Demo:**
-curl https://redbrigde-ai.onrender.com.com/demo
+## Run locally
 
-text
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+export REDBRIDGE_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+.venv/bin/uvicorn app.main:app --reload
+```
 
-## 💰 Business Impact
-- **$333 average annual savings** per optimized service
-- **Enterprise-scale potential:** $450K for 1,000+ services
-- **Conservative approach:** Production-safe recommendations
-- **Real-time optimization** with <100ms response times
+Open `http://127.0.0.1:8000`. For Windows, use `.venv\\Scripts\\` instead of
+`.venv/bin/`.
 
-## 🚀 Key Features
-- ✅ Production-ready FastAPI deployment
-- ✅ Multi-cloud intelligence (AWS, Azure, GCP, IBM Cloud)
-- ✅ Business-aligned optimization with ROI calculations
-- ✅ Comprehensive monitoring and health checks
-- ✅ Enterprise-grade error handling
+## Cloud onboarding
 
-## 📊 API Endpoints
+Create a connection with `POST /v1/connections`, then call
+`POST /v1/connections/{id}/collect`.
 
-| Endpoint | Description |
-|----------|-------------|
-| `/demo` | Sample enterprise workload optimizations |
-| `/optimize` | Single workload analysis |
-| `/health` | System status and monitoring |
-| `/docs` | Interactive API documentation |
+### AWS
 
-## 🧪 Usage Example
+```json
+{"name":"prod-aws","provider":"aws","config":{"role_arn":"arn:aws:iam::123456789012:role/RedBridgeReadOnly","external_id":"unique-value","region":"us-east-1"}}
+```
 
-Business optimization
-curl -X POST https://your-app.onrender.com/optimize
--H "Content-Type: application/json"
--d '{
-"workload_id": "production-api",
-"cpu_utilization": 45,
-"qos_score": 85
-}'
+Use a cross-account role that permits only EC2 describe, Cost Explorer
+read/query, STS assume-role, and Compute Optimizer read actions. Cost Explorer
+and Compute Optimizer must be enabled by the customer.
 
-text
+### Azure
 
-## 🏗️ Architecture
-- **Backend:** FastAPI with Pydantic validation
-- **Deployment:** Render with automated CI/CD
-- **Monitoring:** Built-in health checks and logging
-- **Design:** RESTful API with business intelligence
+```json
+{"name":"prod-azure","provider":"azure","config":{"tenant_id":"...","client_id":"...","client_secret":"...","subscription_id":"..."}}
+```
 
-  <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/e1d2985e-a26a-4bc6-9c7c-cd4f7dbd0ec4" />
+Use a service principal limited to Cost Management query and later add Resource
+Graph, Monitor, and Advisor reader permissions as those collectors are enabled.
 
+### GCP
 
+```json
+{"name":"prod-gcp","provider":"gcp","config":{"service_account":{...},"billing_table":"project.dataset.gcp_billing_export_v1_..."}}
+```
 
-## 📈 What's Next
-- **ML Model Integration:** Deploy ensemble learning model (RF + LightGBM)
-- **Advanced Monitoring:** Prometheus metrics + Grafana dashboards
-- **Enhanced Features:** Batch processing and enterprise dashboards
-- **Portfolio Growth:** Technical blog posts and case studies
+Enable detailed Cloud Billing export to BigQuery first. The connection queries
+the exported table, so it never makes up pricing from public price pages.
 
----
+## Current provider coverage
 
-**Built by Jasper Nathaniel J** | [LinkedIn](https://linkedin.com/in/jasper-nathaniel-j-12403298) | [GitHub](https://github.com/Jappynathaniel)
+AWS is the first end-to-end connector (EC2 inventory, Cost Explorer, and
+Compute Optimizer). Azure Cost Management and GCP BigQuery Billing export are
+live billing connectors; their Resource Graph/Monitor/Advisor and Cloud Asset
+Inventory/Monitoring/Recommender enrichments are intentionally marked planned,
+not represented as delivered capability. Check `/v1/capabilities` for the
+machine-readable coverage matrix.
 
-*Production ML API demonstrating enterprise cloud cost optimization*
+## Deploy to Render
+
+1. Push this replacement to GitHub.
+2. Create a Render Blueprint using `render.yaml`.
+3. Set `REDBRIDGE_DATABASE_URL` to a managed Postgres URL.
+4. Keep the generated `REDBRIDGE_ENCRYPTION_KEY`; set `REDBRIDGE_OPENAI_API_KEY`
+   only if you want the explanation agent.
+
+SQLite is for local development only. Production needs Postgres and a background
+worker/cron service for scheduled collection jobs; the first release exposes
+collection through the API to keep every run observable.
+
+## Agent safety
+
+The agent receives a selected recommendation and its evidence only. It has no
+cloud provider functions and cannot access connection credentials. It can explain
+assumptions, uncertainties, and what a human must verify before approval.
+
