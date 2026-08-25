@@ -7,6 +7,7 @@ boto3==1.35.90
 azure-identity==1.19.0
 google-cloud-bigquery==3.27.0
 openai==1.58.1
+anthropic==0.42.0
 pytest==8.3.4
 httpx==0.28.1
 requests==2.32.3
